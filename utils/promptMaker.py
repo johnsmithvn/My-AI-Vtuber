@@ -22,12 +22,12 @@ def getPrompt():
     for message in history[:-1]:
         prompt.append(message)
 
-    prompt.append(
-        {
-            "role": "system",
-            "content": f"Here is the latest conversation.\n*Make sure your response is within {outputNum} characters!\n",
-        }
-    )
+    # prompt.append(
+    #     {
+    #         "role": "system",
+    #         "content": f"Here is the latest conversation.\n*Make sure your response is within {outputNum} characters!\n",
+    #     }
+    # )
 
     prompt.append(history[-1])
 
