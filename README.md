@@ -34,11 +34,70 @@ This project is inspired by shioridotdev and utilizes various technologies such 
 ## Installation
 
 1. Install the dependencies
+( Install for global )
+    #### Cài xong thì không cần option 1 và 2
+    ```
+    pip install -r requirements.txt
+    ```
+---
+### ✅ Option 1: Dành cho người mới – **Tự động cài đặt**
 
-```
-pip install -r requirements.txt
-```
+1. Mở thư mục dự án.
+2. Chạy 1 trong 2 file sau:
 
+#### 🪟 Windows:
+    ```
+    setup_env.bat
+    ```
+#### 🐧 Linux/macOS:    
+    ```
+    bash setup_env.sh
+    ```
+    > 🧠 Script này sẽ tự động tạo môi trường ảo `.venv`, kích hoạt và cài đầy đủ thư viện cần thiết.
+
+3. Sau này muốn chạy lại thì chỉ cần:
+    ```
+    call .venv\Scripts\activate
+    ```
+    ```
+    python run.py
+    ```
+---
+
+### 🛠 Option 2: Tự cài thủ công (cho ai đã quen)
+
+1. Cài Python 3.9+ nếu chưa có.
+2. (Khuyên dùng) Tạo môi trường ảo:
+3. Kích hoạt môi trường:
+
+- Trên **Windows**:
+  ```
+  call .venv\Scripts\activate
+  ```
+
+- Trên **macOS/Linux**:
+  ```
+  source .venv/bin/activate
+  ```
+
+4. Cài dependencies:
+    ```
+    pip install -r requirements.txt
+    ```
+---
+### 💡 Ghi chú
+- Mỗi lần mở lại terminal mới, nhớ **kích hoạt lại `.venv`** trước khi chạy chương trình.
+    ```
+    call .venv\Scripts\activate
+    ```
+- Nếu dùng VS Code, nó sẽ tự nhận `.venv` nếu bạn mở folder từ đầu.
+
+## 🏃 Run the project
+
+```bash
+python run.py
+```
+---
 2. Create config.py and store your Openai API key
 
 ```

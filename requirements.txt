@@ -10,3 +10,4 @@ pytchat
 requests
 torch
 unidic
+tiktoken
