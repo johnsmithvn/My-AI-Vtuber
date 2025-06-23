@@ -19,6 +19,7 @@ from utils.subtitle import *
 from utils.promptMaker import *
 from utils.twitch_config import *
 from utils.local_llm import local_chat
+import requests
 
 # to help the CLI write unicode characters to the terminal
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
@@ -107,18 +108,44 @@ def transcribe_audio(file):
     result = build_chat_input(owner_name, chat_now)
     conversation.append({'role': 'user', 'content': result})
     openai_answer()
+
+import tiktoken
+# tinh token
+def count_tokens(messages, model="gpt-4o-mini"):
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except:
+        encoding = tiktoken.get_encoding("cl100k_base")  # fallback
+
+    tokens = 0
+    for message in messages:
+        tokens += 4  # default tokens per message
+        for key, value in message.items():
+            tokens += len(encoding.encode(value))
+    tokens += 2  # every reply is primed with <im_start>assistant
+    return tokens
+
 # function to get an answer from OpenAI
 def openai_answer():
-    global total_characters, conversation
-    total_characters = sum(len(d['content']) for d in conversation)
-    while total_characters > 4000:
+    max_prompt_tokens = 6000 
+    total_tokens = count_tokens(conversation, model="gpt-4o-mini")
+    while total_tokens > max_prompt_tokens:
         try:
-            # print(total_characters)
-            # print(len(conversation))
-            conversation.pop(2)
-            total_characters = sum(len(d['content']) for d in conversation)
+            conversation.pop(2)  # bỏ bớt message cũ nhất (sau system)
+            total_tokens = count_tokens(conversation, model="gpt-4o-mini")
         except Exception as e:
-            print("Error removing old messages: {0}".format(e))
+            print("Error removing old messages:", e)
+            break
+    # global total_characters, conversation
+    # total_characters = sum(len(d['content']) for d in conversation)
+    # while total_characters > 4000:
+    #     try:
+    #         # print(total_characters)
+    #         # print(len(conversation))
+    #         conversation.pop(2)
+    #         total_characters = sum(len(d['content']) for d in conversation)
+    #     except Exception as e:
+    #         print("Error removing old messages: {0}".format(e))
     with open("conversation.json", "w", encoding="utf-8") as f:
         json.dump(history, f, indent=4)
     prompt = getPrompt()
@@ -126,15 +153,23 @@ def openai_answer():
         message = local_chat(prompt)
     else:
         try:
-            response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            # model= "gpt-4o-mini",
-            messages=prompt,
-            max_tokens=128,
-            temperature=1,
-            top_p=0.9
-        )
-            message = response['choices'][0]['message']['content']
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {api_key}",
+            }
+            payload = {
+                "model": "gpt-4o-mini",  # hoặc gpt-3.5-turbo nếu muốn
+                "messages": prompt,
+                "max_tokens": 128,
+                "temperature": 1,
+                "top_p": 0.9,
+            }
+            res = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            if res.status_code == 200:
+                message = res.json()['choices'][0]['message']['content']
+            else:
+                print("❌ Lỗi HTTP:", res.status_code, res.text)
+                message = "[LỖI]: OpenAI HTTP Error."
         except openai.error.RateLimitError:
             print("⚠️ Đã vượt giới hạn API OpenAI. Vui lòng kiểm tra quota hoặc dùng model local.")
             message = "[LỖI]: Vượt quota OpenAI."
@@ -215,10 +250,10 @@ def translate_text(text):
         return
     # Choose between the available TTS engines
     # Japanese TTS
-    # voicevox_tts(tts)
+    voicevox_tts(tts)
 
     # Silero TTS, Silero TTS can generate English, Russian, French, Hindi, Spanish, German, etc. Uncomment the line below. Make sure the input is in that language
-    silero_tts(tts_en, "en", "v3_en", "en_21")
+    # silero_tts(tts_en, "en", "v3_en", "en_21")
 
     # Generate Subtitle
     generate_subtitle(chat_now, text)

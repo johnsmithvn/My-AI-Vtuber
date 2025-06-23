@@ -3,6 +3,7 @@ import torch
 import requests
 import urllib.parse
 from utils.katakana import *
+import json
 
 # https://github.com/snakers4/silero-models#text-to-speech
 def silero_tts(tts, language, model, speaker):
@@ -30,15 +31,37 @@ def voicevox_tts(tts):
     voicevox_url = 'http://localhost:50021'
     # Convert the text to katakana. Example: ORANGE -> オレンジ, so the voice will sound more natural
     katakana_text = katakana_converter(tts)
-    # You can change the voice to your liking. You can find the list of voices on speaker.json
-    # or check the website https://voicevox.hiroshiba.jp
-    params_encoded = urllib.parse.urlencode({'text': katakana_text, 'speaker': 46})
-    request = requests.post(f'{voicevox_url}/audio_query?{params_encoded}')
-    params_encoded = urllib.parse.urlencode({'speaker': 46, 'enable_interrogative_upspeak': True})
-    request = requests.post(f'{voicevox_url}/synthesis?{params_encoded}', json=request.json())
+    try:
+   
+        # You can change the voice to your liking. You can find the list of voices on speaker.json
+        # or check the website https://voicevox.hiroshiba.jp
+        # Gửi request audio_query
+        params_encoded = urllib.parse.urlencode({'text': katakana_text, 'speaker': 46})
+        response_query  = requests.post(f'{voicevox_url}/audio_query?{params_encoded}')
+        response_query.raise_for_status()  # raise nếu lỗi HTTP
+        
+        # Gửi request synthesis
+        synthesis_params = urllib.parse.urlencode({'speaker': 46, 'enable_interrogative_upspeak': True})
+        response_synth = requests.post(
+            f'{voicevox_url}/synthesis?{synthesis_params}',
+            json=response_query.json()
+        )
+        response_synth.raise_for_status()
+        # Lưu file âm thanh
+        with open("test.wav", "wb") as outfile:
+            outfile.write(response_synth.content)
+    except requests.exceptions.ConnectionError:
+        print(f"❌ Không kết nối được VoiceVox tại {voicevox_url}.")
+        print("💡 Hãy đảm bảo bạn đã bật VoiceVox Engine (VoicevoxEngine.exe).")
+        return
 
-    with open("test.wav", "wb") as outfile:
-        outfile.write(request.content)
+    except requests.exceptions.HTTPError as err:
+        print("❌ Lỗi HTTP khi gọi VoiceVox:", err)
+        return
+
+    except Exception as e:
+        print("❌ Lỗi không xác định khi gọi VoiceVox:", e)
+        return
 
 if __name__ == "__main__":
     silero_tts()
