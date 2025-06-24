@@ -4,6 +4,10 @@ import requests
 import urllib.parse
 from utils.katakana import *
 import json
+from pydub import AudioSegment
+import simpleaudio as sa
+import io
+from config import VOICEVOX_BASE_URL
 
 # https://github.com/snakers4/silero-models#text-to-speech
 def silero_tts(tts, language, model, speaker):
@@ -25,43 +29,40 @@ def silero_tts(tts, language, model, speaker):
                                 speaker=speaker,
                                 sample_rate=sample_rate)
     
-def voicevox_tts(tts):
-    # You need to run VoicevoxEngine.exe first before running this script
-    
-    voicevox_url = 'http://localhost:50021'
-    # Convert the text to katakana. Example: ORANGE -> オレンジ, so the voice will sound more natural
+
+def voicevox_tts(tts, use_memory=True):
+    voicevox_url =VOICEVOX_BASE_URL
     katakana_text = katakana_converter(tts)
+
     try:
-   
-        # You can change the voice to your liking. You can find the list of voices on speaker.json
-        # or check the website https://voicevox.hiroshiba.jp
-        # Gửi request audio_query
         params_encoded = urllib.parse.urlencode({'text': katakana_text, 'speaker': 46})
         response_query  = requests.post(f'{voicevox_url}/audio_query?{params_encoded}')
-        response_query.raise_for_status()  # raise nếu lỗi HTTP
-        
-        # Gửi request synthesis
+        response_query.raise_for_status()
+
         synthesis_params = urllib.parse.urlencode({'speaker': 46, 'enable_interrogative_upspeak': True})
         response_synth = requests.post(
             f'{voicevox_url}/synthesis?{synthesis_params}',
             json=response_query.json()
         )
         response_synth.raise_for_status()
-        # Lưu file âm thanh
-        with open("test.wav", "wb") as outfile:
-            outfile.write(response_synth.content)
-    except requests.exceptions.ConnectionError:
-        print(f"❌ Không kết nối được VoiceVox tại {voicevox_url}.")
-        print("💡 Hãy đảm bảo bạn đã bật VoiceVox Engine (VoicevoxEngine.exe).")
-        return
 
-    except requests.exceptions.HTTPError as err:
-        print("❌ Lỗi HTTP khi gọi VoiceVox:", err)
-        return
+        if use_memory:
+            # Phát trực tiếp từ bộ nhớ
+            audio = AudioSegment.from_file(io.BytesIO(response_synth.content), format="wav")
+            playback = sa.play_buffer(
+                audio.raw_data,
+                num_channels=audio.channels,
+                bytes_per_sample=audio.sample_width,
+                sample_rate=audio.frame_rate
+            )
+            playback.wait_done()
+        else:
+            # Lưu file và để run.py dùng winsound
+            with open("test.wav", "wb") as outfile:
+                outfile.write(response_synth.content)
 
     except Exception as e:
-        print("❌ Lỗi không xác định khi gọi VoiceVox:", e)
-        return
+        print("❌ Voicevox error:", e)
 
 if __name__ == "__main__":
     silero_tts()

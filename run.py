@@ -20,6 +20,10 @@ from utils.promptMaker import *
 from utils.twitch_config import *
 from utils.local_llm import local_chat
 import requests
+from utils.speech_pipeline import now, process_ai_response_async, playback_worker
+from utils.speech_pipeline import audio_queue  # nếu bạn muốn tự xử lý queue ngoài
+
+use_memory_audio = True  # True = phát trực tiếp từ bộ nhớ, False = phát từ file test.wav
 
 # to help the CLI write unicode characters to the terminal
 sys.stdout = open(sys.stdout.fileno(), mode='w', encoding='utf8', buffering=1)
@@ -41,6 +45,16 @@ owner_name = "Ardha"
 blacklist = ["Nightbot", "streamelements"]
 use_username_prefix = True
 running = True  # Flag điều khiển dừng chương trình
+
+import asyncio
+import concurrent.futures
+from queue import Queue
+from threading import Thread
+
+# Hàng đợi phát âm thanh
+# audio_queue = Queue()
+
+
 
 def handle_exit(sig, frame):
     global running
@@ -136,16 +150,7 @@ def openai_answer():
         except Exception as e:
             print("Error removing old messages:", e)
             break
-    # global total_characters, conversation
-    # total_characters = sum(len(d['content']) for d in conversation)
-    # while total_characters > 4000:
-    #     try:
-    #         # print(total_characters)
-    #         # print(len(conversation))
-    #         conversation.pop(2)
-    #         total_characters = sum(len(d['content']) for d in conversation)
-    #     except Exception as e:
-    #         print("Error removing old messages: {0}".format(e))
+
     with open("conversation.json", "w", encoding="utf-8") as f:
         json.dump(history, f, indent=4)
     prompt = getPrompt()
@@ -177,7 +182,13 @@ def openai_answer():
             print("❌ Lỗi gọi OpenAI:", e)
             message = "[LỖI]: Không phản hồi từ OpenAI."
     conversation.append({'role': 'assistant', 'content': message})
-    translate_text(message)
+    print(f"{now()} [🤖 AI RESPONSE] {message}")
+
+     # Thay vì gọi translate_text, ta gọi hàm async mới
+    try:
+        asyncio.run(process_ai_response_async(message, chat_now))
+    except Exception as e:
+        print("❌ Async processing error:", e)
 # function to capture livechat from youtube
 
 def yt_livechat(video_id):
@@ -230,50 +241,6 @@ def twitch_livechat():
                 print(chat)
         except Exception as e:
             print("Error receiving chat: {0}".format(e))
-# translating is optional
-def translate_text(text):
-    global is_Speaking
-    # subtitle will act as subtitle for the viewer
-    # subtitle = translate_google(text, "ID")
-
-    # tts will be the string to be converted to audio
-    detect = detect_google(text)
-    tts = translate_google(text, f"{detect}", "JA")
-    tts_en = translate_google(text, f"{detect}", "EN")
-    try:
-        # print("ID Answer: " + subtitle)
-
-        print("JP Answer:", tts)
-        print("EN Answer:", tts_en)
-    except Exception as e:
-        print("Error printing text:", e)
-        return
-    # Choose between the available TTS engines
-    # Japanese TTS
-    voicevox_tts(tts)
-
-    # Silero TTS, Silero TTS can generate English, Russian, French, Hindi, Spanish, German, etc. Uncomment the line below. Make sure the input is in that language
-    # silero_tts(tts_en, "en", "v3_en", "en_21")
-
-    # Generate Subtitle
-    generate_subtitle(chat_now, text)
-
-    time.sleep(1)
-
-    # is_Speaking is used to prevent the assistant speaking more than one audio at a time
-    is_Speaking = True
-    try:
-        winsound.PlaySound("test.wav", winsound.SND_FILENAME)
-    except:
-        print("⚠️ Sound playback error")
-    is_Speaking = False
-
-    # Clear the text files after the assistant has finished speaking
-    time.sleep(1)
-    with open("output.txt", "w") as f:
-        f.truncate(0)
-    with open("chat.txt", "w") as f:
-        f.truncate(0)
 
 def preparation():
     global conversation, chat_now, chat, chat_prev
@@ -282,16 +249,25 @@ def preparation():
         # then the assistant will answer the chat
         chat_now = chat
         if not is_Speaking and chat_now != chat_prev:
-                        # Saving chat history
-
+            # Saving chat history
+            print(f"{now()} [🎧 NEW MESSAGE] {chat_now}")
             conversation.append({'role': 'user', 'content': chat_now})
             chat_prev = chat_now
             openai_answer()
         time.sleep(1)
 
+
+
+
+
+def start_playback_worker():
+    Thread(target=playback_worker, args=(lambda: running,), daemon=True).start()
+
 if __name__ == "__main__":
     try:
-          # You can change the mode to 1 if you want to record audio from your microphone
+         # Khởi động playback worker thread
+        start_playback_worker()
+        # You can change the mode to 1 if you want to record audio from your microphone
         # or change the mode to 2 if you want to capture livechat from youtube
         api_mode = input("Chọn API (1 - Local model, 2 - OpenAI API): ")
         use_local_api = api_mode.strip() == "1"
@@ -325,3 +301,4 @@ if __name__ == "__main__":
         print("❌ Lỗi chương trình:", e)
     finally:
         print("✅ Đã thoát chương trình.")
+

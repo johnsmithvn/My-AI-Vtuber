@@ -1,8 +1,9 @@
 import requests
 import json
+from config import LOCAL_LLM_URL
 
 def local_chat(prompt_messages):
-    url = "http://localhost:1234/v1/chat/completions"
+    url = LOCAL_LLM_URL
     headers = {"Content-Type": "application/json"}
 
     data = {
